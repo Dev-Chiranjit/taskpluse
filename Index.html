@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TaskPulse - To-Do & Progress Tracker</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            950: '#020617',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        input[type="checkbox"]:checked + div {
+            background-color: #4f46e5;
+            border-color: #4f46e5;
+        }
+        input[type="checkbox"]:checked + div svg {
+            display: block;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between selection:bg-indigo-500 selection:text-white">
+
+<!-- Header Section -->
+<header class="w-full bg-slate-900 border-b border-slate-800 sticky top-0 z-30 px-4 py-3 shadow-md">
+    <div class="max-w-md mx-auto flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+            <div class="bg-indigo-600 text-white p-2 rounded-xl shadow-lg shadow-indigo-500/30">
+                <i class="fa-solid fa-bolt-lightning text-lg"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-lg leading-tight text-white">TaskPulse</h1>
+                <p class="text-xs text-slate-400" id="current-date">Today</p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-2 bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700">
+            <i class="fa-solid fa-fire text-amber-500"></i>
+            <span id="streak-count" class="text-sm font-bold text-amber-400">0 Days</span>
+        </div>
+    </div>
+</header>
+
+<!-- Main App Container -->
+<main class="w-full max-w-md mx-auto px-4 py-4 flex-grow space-y-5">
+
+    <!-- Progress Card -->
+    <div class="bg-gradient-to-br from-slate-900 to-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl relative overflow-hidden">
+        <div class="absolute -right-6 -bottom-6 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="text-sm font-semibold tracking-wider uppercase text-slate-400">Daily Progress</h2>
+            <span id="progress-text" class="text-sm font-bold text-indigo-400">0%</span>
+        </div>
+        <div class="w-full bg-slate-800 h-3 rounded-full overflow-hidden p-0.5 border border-slate-700/50">
+            <div id="progress-bar" class="bg-gradient-to-r from-indigo-500 to-purple-500 h-full rounded-full transition-all duration-500 w-0"></div>
+        </div>
+        <div class="mt-3 flex justify-between text-xs text-slate-400 font-medium">
+            <span id="completed-count">0 of 0 completed</span>
+            <span id="pending-count">0 remaining</span>
+        </div>
+    </div>
+
+    <!-- Quick Input Bar -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg space-y-3">
+        <div class="flex items-center space-x-2">
+            <input type="text" id="task-input" placeholder="What needs to be done today? (e.g., Math)" 
+                onkeydown="if(event.key === 'Enter') window.quickAddTask()"
+                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors">
+            <button type="button" onclick="window.openModal()" class="bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white px-3.5 py-3 rounded-xl border border-slate-700 transition-colors flex items-center justify-center">
+                <i class="fa-solid fa-sliders text-sm"></i>
+            </button>
+        </div>
+        <button type="button" onclick="window.quickAddTask()" class="w-full bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white font-semibold py-3 rounded-xl shadow-lg shadow-indigo-600/30 transition-all text-sm flex items-center justify-center space-x-2">
+            <i class="fa-solid fa-plus"></i>
+            <span>Add Task</span>
+        </button>
+    </div>
+
+    <!-- Filter Tabs -->
+    <div class="flex items-center justify-between space-x-2 bg-slate-900/60 p-1.5 rounded-2xl border border-slate-800/80">
+        <button type="button" onclick="window.setFilter('all')" id="filter-all" class="flex-1 py-1.5 text-xs font-semibold rounded-xl transition-all bg-indigo-600 text-white shadow">All</button>
+        <button type="button" onclick="window.setFilter('active')" id="filter-active" class="flex-1 py-1.5 text-xs font-semibold rounded-xl transition-all text-slate-400 hover:text-white">Active</button>
+        <button type="button" onclick="window.setFilter('completed')" id="filter-completed" class="flex-1 py-1.5 text-xs font-semibold rounded-xl transition-all text-slate-400 hover:text-white">Done</button>
+    </div>
+
+    <!-- Tasks List Container -->
+    <div class="space-y-3" id="tasks-container"></div>
+
+    <!-- Empty State -->
+    <div id="empty-state" class="hidden flex flex-col items-center justify-center py-12 text-center">
+        <div class="w-16 h-16 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-center text-slate-500 mb-3 text-xl shadow-inner">
+            <i class="fa-solid fa-clipboard-list"></i>
+        </div>
+        <p class="text-slate-300 font-medium text-sm">No tasks found</p>
+        <p class="text-slate-500 text-xs mt-1">Add a new task above to start tracking your progress!</p>
+    </div>
+
+</main>
+
+<!-- Advanced Task Modal -->
+<div id="task-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center hidden p-0 sm:p-4">
+    <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-t-3xl sm:rounded-2xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h3 class="font-bold text-base text-white">Advanced Task Details</h3>
+            <button type="button" onclick="window.closeModal()" class="text-slate-400 hover:text-white p-1">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+        
+        <div class="space-y-3">
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Task Title</label>
+                <input type="text" id="modal-title" placeholder="e.g., Complete Math Syllabus" 
+                    class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500">
+            </div>
+            
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Category</label>
+                    <select id="modal-category" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500">
+                        <option value="Study">📚 Study</option>
+                        <option value="Work">💼 Work</option>
+                        <option value="Personal">🎯 Personal</option>
+                        <option value="Fitness">⚡ Fitness</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Priority</label>
+                    <select id="modal-priority" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500">
+                        <option value="High">🔥 High</option>
+                        <option value="Medium" selected>⚡ Medium</option>
+                        <option value="Low">🌱 Low</option>
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Due Date</label>
+                <input type="date" id="modal-date" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500">
+            </div>
+        </div>
+
+        <button type="button" onclick="window.saveAdvancedTask()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 rounded-xl shadow-lg shadow-indigo-600/30 transition-all text-sm mt-2">
+            Save & Add Task
+        </button>
+    </div>
+</div>
+
+<!-- Footer Reset Action -->
+<footer class="w-full max-w-md mx-auto px-4 pt-6 pb-8 text-center">
+    <button type="button" onclick="window.clearAllTasks()" class="text-xs text-slate-500 hover:text-red-400 transition-colors underline underline-offset-4">
+        Reset / Clear All Tasks
+    </button>
+</footer>
+
+<!-- App Script Logic -->
+<script>
+(function() {
+    let tasks = [];
+    let streak = 0;
+    let lastActiveDate = '';
+    let currentFilter = 'all';
+    let openSubBoxes = {};
+
+    // Safely load and sanitize localStorage data so old data never breaks the app
+    try {
+        const rawTasks = JSON.parse(localStorage.getItem('taskpulse_tasks'));
+        if (Array.isArray(rawTasks)) {
+            tasks = rawTasks.filter(t => t && typeof t === 'object').map(t => ({
+                id: Number(t.id) || Date.now() + Math.floor(Math.random() * 1000),
+                title: String(t.title || 'Untitled Task'),
+                category: String(t.category || 'Personal'),
+                priority: String(t.priority || 'Medium'),
+                date: String(t.date || new Date().toISOString().split('T')[0]),
+                completed: Boolean(t.completed),
+                subtasks: Array.isArray(t.subtasks) ? t.subtasks.filter(st => st && typeof st === 'object').map(st => ({
+                    id: Number(st.id) || Date.now() + Math.floor(Math.random() * 1000),
+                    title: String(st.title || 'Sub-task'),
+                    completed: Boolean(st.completed),
+                    children: Array.isArray(st.children) ? st.children.filter(ch => ch && typeof ch === 'object').map(ch => ({
+                        id: Number(ch.id) || Date.now() + Math.floor(Math.random() * 1000),
+                        title: String(ch.title || 'Sub-item'),
+                        completed: Boolean(ch.completed)
+                    })) : []
+                })) : []
+            }));
+        }
+        streak = parseInt(localStorage.getItem('taskpulse_streak')) || 0;
+        lastActiveDate = localStorage.getItem('taskpulse_last_date') || '';
+    } catch (e) {
+        tasks = [];
+        streak = 0;
+    }
+
+    // Set Today's Date
+    const options = { weekday: 'long', month: 'short', day: 'numeric' };
+    const dateEl = document.getElementById('current-date');
+    if (dateEl) dateEl.innerText = new Date().toLocaleDateString('en-US', options);
+
+    function checkStreak() {
+        const today = new Date().toDateString();
+        if (lastActiveDate !== today) {
+            lastActiveDate = today;
+            localStorage.setItem('taskpulse_last_date', today);
+        }
+        const streakEl = document.getElementById('streak-count');
+        if (streakEl) streakEl.innerText = streak + ' Days';
+    }
+
+    function saveToStorage() {
+        localStorage.setItem('taskpulse_tasks', JSON.stringify(tasks));
+        localStorage.setItem('taskpulse_streak', String(streak));
+        renderTasks();
+        updateProgress();
+        checkStreak();
+    }
+
+    function escapeHtml(text) {
+        const str = String(text || '');
+        const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+        return str.replace(/[&<>"']/g, m => map[m]);
+    }
+
+    // Modal Functions
+    window.openModal = function() {
+        document.getElementById('task-modal').classList.remove('hidden');
+        document.getElementById('modal-title').value = document.getElementById('task-input').value;
+        document.getElementById('modal-date').value = new Date().toISOString().split('T')[0];
+    };
+
+    window.closeModal = function() {
+        document.getElementById('task-modal').classList.add('hidden');
+    };
+
+    // Add Quick Main Task
+    window.quickAddTask = function() {
+        const input = document.getElementById('task-input');
+        const text = input.value.trim();
+        if (!text) return;
+
+        tasks.unshift({
+            id: Date.now(),
+            title: text,
+            category: 'Personal',
+            priority: 'Medium',
+            date: new Date().toISOString().split('T')[0],
+            completed: false,
+            subtasks: []
+        });
+
+        input.value = '';
+        saveToStorage();
+    };
+
+    // Save Task from Modal
+    window.saveAdvancedTask = function() {
+        const title = document.getElementById('modal-title').value.trim();
+        const category = document.getElementById('modal-category').value;
+        const priority = document.getElementById('modal-priority').value;
+        const date = document.getElementById('modal-date').value || new Date().toISOString().split('T')[0];
+
+        if (!title) return;
+
+        tasks.unshift({
+            id: Date.now(),
+            title: title,
+            category: category,
+            priority: priority,
+            date: date,
+            completed: false,
+            subtasks: []
+        });
+
+        document.getElementById('task-input').value = '';
+        window.closeModal();
+        saveToStorage();
+    };
+
+    // Toggle Main Task (Level 1 - e.g. Math)
+    window.toggleMainTask = function(taskId) {
+        tasks = tasks.map(t => {
+            if (t.id === taskId) {
+                const newStatus = !t.completed;
+                if (newStatus) streak += 1;
+                const updatedSubtasks = (t.subtasks || []).map(st => ({
+                    ...st,
+                    completed: newStatus,
+                    children: (st.children || []).map(ch => ({ ...ch, completed: newStatus }))
+                }));
+                return { ...t, completed: newStatus, subtasks: updatedSubtasks };
+            }
+            return t;
+        });
+        saveToStorage();
+    };
+
+    // Add Sub-task (Level 2 - e.g. Trigonometry inside Math)
+    window.addInlineSubtask = function(taskId) {
+        const input = document.getElementById('subtask-input-' + taskId);
+        if (!input) return;
+        const text = input.value.trim();
+        if (!text) return;
+
+        tasks = tasks.map(t => {
+            if (t.id === taskId) {
+                const updatedSubtasks = [...(t.subtasks || []), {
+                    id: Date.now(),
+                    title: text,
+                    completed: false,
+                    children: []
+                }];
+                return { ...t, completed: false, subtasks: updatedSubtasks };
+            }
+            return t;
+        });
+        input.value = '';
+        saveToStorage();
+    };
+
+    // Toggle Sub-task (Level 2 - e.g. Trigonometry)
+    window.toggleSubtask = function(taskId, subtaskId) {
+        tasks = tasks.map(t => {
+            if (t.id === taskId) {
+                const updatedSubtasks = (t.subtasks || []).map(st => {
+                    if (st.id === subtaskId) {
+                        const newStatus = !st.completed;
+                        if (newStatus) streak += 1;
+                        const updatedChildren = (st.children || []).map(ch => ({ ...ch, completed: newStatus }));
+                        return { ...st, completed: newStatus, children: updatedChildren };
+                    }
+                    return st;
+                });
+                const allSubDone = updatedSubtasks.length > 0 && updatedSubtasks.every(st => st.completed);
+                return { ...t, completed: allSubDone, subtasks: updatedSubtasks };
+            }
+            return t;
+        });
+        saveToStorage();
+    };
+
+    // Open/Close Nested Input Box inside Sub-task (e.g. inside Trigonometry)
+    window.toggleNestedBox = function(subtaskId) {
+        openSubBoxes[subtaskId] = !openSubBoxes[subtaskId];
+        renderTasks();
+        if (openSubBoxes[subtaskId]) {
+            setTimeout(() => {
+                const inp = document.getElementById('nested-input-' + subtaskId);
+                if (inp) inp.focus();
+            }, 50);
+        }
+    };
+
+    // Add Nested Sub-item (Level 3 - inside Trigonometry)
+    window.addNestedItem = function(taskId, subtaskId) {
+        const input = document.getElementById('nested-input-' + subtaskId);
+        if (!input) return;
+        const text = input.value.trim();
+        if (!text) return;
+
+        tasks = tasks.map(t => {
+            if (t.id === taskId) {
+                const updatedSubtasks = (t.subtasks || []).map(st => {
+                    if (st.id === subtaskId) {
+                        const updatedChildren = [...(st.children || []), {
+                            id: Date.now(),
+                            title: text,
+                            completed: false
+                        }];
+                        return { ...st, completed: false, children: updatedChildren };
+                    }
+                    return st;
+                });
+                return { ...t, completed: false, subtasks: updatedSubtasks };
+            }
+            return t;
+        });
+        input.value = '';
+        saveToStorage();
+    };
+
+    // Toggle Nested Sub-item (Level 3 - inside Trigonometry)
+    window.toggleNestedItem = function(taskId, subtaskId, childId) {
+        tasks = tasks.map(t => {
+            if (t.id === taskId) {
+                const updatedSubtasks = (t.subtasks || []).map(st => {
+                    if (st.id === subtaskId) {
+                        const updatedChildren = (st.children || []).map(ch => {
+                            if (ch.id === childId) {
+                                const newStatus = !ch.completed;
+                                if (newStatus) streak += 1;
+                                return { ...ch, completed: newStatus };
+                            }
+                            return ch;
+                        });
+                        const allChildrenDone = updatedChildren.length > 0 && updatedChildren.every(ch => ch.completed);
+                        return { ...st, completed: allChildrenDone, children: updatedChildren };
+                    }
+                    return st;
+                });
+                const allSubDone = updatedSubtasks.length > 0 && updatedSubtasks.every(st => st.completed);
+                return { ...t, completed: allSubDone, subtasks: updatedSubtasks };
+            }
+            return t;
+        });
+        saveToStorage();
+    };
+
+    // Delete Handlers
+    window.deleteTask = function(taskId) {
+        tasks = tasks.filter(t => t.id !== taskId);
+        saveToStorage();
+    };
+
+    window.deleteSubtask = function(taskId, subtaskId) {
+        tasks = tasks.map(t => {
+            if (t.id === taskId) {
+                return { ...t, subtasks: (t.subtasks || []).filter(st => st.id !== subtaskId) };
+            }
+            return t;
+        });
+        saveToStorage();
+    };
+
+    window.deleteNestedItem = function(taskId, subtaskId, childId) {
+        tasks = tasks.map(t => {
+            if (t.id === taskId) {
+                const updatedSubtasks = (t.subtasks || []).map(st => {
+                    if (st.id === subtaskId) {
+                        return { ...st, children: (st.children || []).filter(ch => ch.id !== childId) };
+                    }
+                    return st;
+                });
+                return { ...t, subtasks: updatedSubtasks };
+            }
+            return t;
+        });
+        saveToStorage();
+    };
+
+    // Filter Handler
+    window.setFilter = function(filter) {
+        currentFilter = filter;
+        ['all', 'active', 'completed'].forEach(f => {
+            const btn = document.getElementById('filter-' + f);
+            if (!btn) return;
+            if (f === filter) {
+                btn.className = "flex-1 py-1.5 text-xs font-semibold rounded-xl transition-all bg-indigo-600 text-white shadow";
+            } else {
+                btn.className = "flex-1 py-1.5 text-xs font-semibold rounded-xl transition-all text-slate-400 hover:text-white";
+            }
+        });
+        renderTasks();
+    };
+
+    // Calculate Progress across all tasks, sub-tasks, and nested items
+    function updateProgress() {
+        let total = 0;
+        let completed = 0;
+
+        tasks.forEach(t => {
+            if (t.subtasks && t.subtasks.length > 0) {
+                t.subtasks.forEach(st => {
+                    if (st.children && st.children.length > 0) {
+                        total += st.children.length;
+                        completed += st.children.filter(ch => ch.completed).length;
+                    } else {
+                        total += 1;
+                        if (st.completed) completed += 1;
+                    }
+                });
+            } else {
+                total += 1;
+                if (t.completed) completed += 1;
+            }
+        });
+
+        const pending = total - completed;
+        const percentage = total === 0 ? 0 : Math.round((completed / total) * 100);
+
+        document.getElementById('progress-bar').style.width = percentage + '%';
+        document.getElementById('progress-text').innerText = percentage + '%';
+        document.getElementById('completed-count').innerText = completed + ' of ' + total + ' completed';
+        document.getElementById('pending-count').innerText = pending + ' remaining';
+    }
+
+    // Render Tasks
+    function renderTasks() {
+        const container = document.getElementById('tasks-container');
+        const emptyState = document.getElementById('empty-state');
+
+        let filtered = tasks;
+        if (currentFilter === 'active') {
+            filtered = tasks.filter(t => !t.completed);
+        } else if (currentFilter === 'completed') {
+            filtered = tasks.filter(t => t.completed);
+        }
+
+        if (filtered.length === 0) {
+            container.innerHTML = '';
+            emptyState.classList.remove('hidden');
+            updateProgress();
+            return;
+        }
+
+        emptyState.classList.add('hidden');
+
+        container.innerHTML = filtered.map(t => {
+            let priorityColor = 'text-slate-400 bg-slate-800';
+            if (t.priority === 'High') priorityColor = 'text-red-400 bg-red-500/10 border border-red-500/20';
+            if (t.priority === 'Medium') priorityColor = 'text-amber-400 bg-amber-500/10 border border-amber-500/20';
+            if (t.priority === 'Low') priorityColor = 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20';
+
+            return `
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-md transition-all hover:border-slate-700 space-y-3">
+                    <!-- Main Task Header (e.g., math) -->
+                    <div class="flex items-start justify-between">
+                        <div class="flex items-start space-x-3 overflow-hidden pr-2">
+                            <label class="relative flex items-center justify-center cursor-pointer mt-0.5 flex-shrink-0">
+                                <input type="checkbox" ${t.completed ? 'checked' : ''} onchange="window.toggleMainTask(${t.id})" class="sr-only">
+                                <div class="w-5 h-5 border-2 border-slate-600 rounded-md bg-slate-950 flex items-center justify-center transition-all">
+                                    <svg class="w-3 h-3 text-white hidden pointer-events-none" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                </div>
+                            </label>
+                            <div class="overflow-hidden">
+                                <h4 class="text-sm font-semibold text-slate-100 truncate ${t.completed ? 'line-through text-slate-500' : ''}">${escapeHtml(t.title)}</h4>
+                                <div class="flex items-center space-x-2 mt-1 flex-wrap gap-y-1">
+                                    <span class="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-800 text-slate-400">${escapeHtml(t.category)}</span>
+                                    <span class="text-[10px] font-semibold px-2 py-0.5 rounded-md ${priorityColor}">${escapeHtml(t.priority)}</span>
+                                    <span class="text-[10px] text-slate-500"><i class="fa-regular fa-calendar mr-1"></i>${escapeHtml(t.date)}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <button type="button" onclick="window.deleteTask(${t.id})" class="text-slate-600 hover:text-red-400 p-1.5 transition-colors">
+                            <i class="fa-solid fa-trash-can text-sm"></i>
+                        </button>
+                    </div>
+
+                    <!-- Sub-tasks List (e.g., Trigonometry) -->
+                    <div class="space-y-2 pl-3 border-l-2 border-slate-800 ml-2">
+                        ${(t.subtasks || []).map(st => `
+                            <div class="space-y-1.5 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+                                <div class="flex items-center justify-between text-xs text-slate-200">
+                                    <label class="flex items-center space-x-2.5 cursor-pointer overflow-hidden flex-grow">
+                                        <input type="checkbox" ${st.completed ? 'checked' : ''} onchange="window.toggleSubtask(${t.id}, ${st.id})" class="sr-only">
+                                        <div class="w-4 h-4 border border-slate-600 rounded bg-slate-900 flex items-center justify-center transition-all flex-shrink-0">
+                                            <svg class="w-2.5 h-2.5 text-white hidden pointer-events-none" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                        </div>
+                                        <span class="truncate font-medium ${st.completed ? 'line-through text-slate-500' : ''}">${escapeHtml(st.title)}</span>
+                                    </label>
+                                    <div class="flex items-center space-x-1.5 ml-2 flex-shrink-0">
+                                        <button type="button" onclick="window.toggleNestedBox(${st.id})" class="bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-md text-[10px] font-semibold flex items-center space-x-1 transition-colors">
+                                            <i class="fa-solid fa-plus text-[9px]"></i>
+                                            <span>Sub-topic</span>
+                                        </button>
+                                        <button type="button" onclick="window.deleteSubtask(${t.id}, ${st.id})" class="text-slate-600 hover:text-red-400 px-1">
+                                            <i class="fa-solid fa-xmark text-xs"></i>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Nested Items inside Sub-task (e.g., inside Trigonometry) -->
+                                ${(st.children && st.children.length > 0) ? `
+                                    <div class="pl-3 border-l-2 border-indigo-500/40 ml-1.5 space-y-1 pt-1">
+                                        ${st.children.map(ch => `
+                                            <div class="flex items-center justify-between text-[11px] text-slate-300 bg-slate-900/90 px-2.5 py-1.5 rounded-lg border border-slate-800">
+                                                <label class="flex items-center space-x-2 cursor-pointer overflow-hidden flex-grow">
+                                                    <input type="checkbox" ${ch.completed ? 'checked' : ''} onchange="window.toggleNestedItem(${t.id}, ${st.id}, ${ch.id})" class="sr-only">
+                                                    <div class="w-3.5 h-3.5 border border-slate-600 rounded bg-slate-950 flex items-center justify-center transition-all flex-shrink-0">
+                                                        <svg class="w-2 h-2 text-white hidden pointer-events-none" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                                    </div>
+                                                    <span class="truncate ${ch.completed ? 'line-through text-slate-500' : ''}">${escapeHtml(ch.title)}</span>
+                                                </label>
+                                                <button type="button" onclick="window.deleteNestedItem(${t.id}, ${st.id}, ${ch.id})" class="text-slate-600 hover:text-red-400 px-1 ml-2">
+                                                    <i class="fa-solid fa-xmark text-[10px]"></i>
+                                                </button>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                ` : ''}
+
+                                <!-- Input Box to Add Inside Sub-task (e.g., inside Trigonometry) -->
+                                ${openSubBoxes[st.id] ? `
+                                    <div class="pl-3 ml-1.5 flex items-center space-x-1.5 pt-1">
+                                        <input type="text" id="nested-input-${st.id}" placeholder="Add inside ${escapeHtml(st.title)}..." 
+                                            onkeydown="if(event.key === 'Enter') window.addNestedItem(${t.id}, ${st.id})"
+                                            class="w-full bg-slate-900 border border-indigo-500/50 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-400">
+                                        <button type="button" onclick="window.addNestedItem(${t.id}, ${st.id})" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-[11px] font-semibold">Add</button>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `).join('')}
+
+                        <!-- Input to Add Sub-step inside Main Task -->
+                        <div class="flex items-center space-x-2 pt-1">
+                            <input type="text" id="subtask-input-${t.id}" placeholder="+ Add sub-step (e.g., Trigonometry)..." 
+                                onkeydown="if(event.key === 'Enter') window.addInlineSubtask(${t.id})"
+                                class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500">
+                            <button type="button" onclick="window.addInlineSubtask(${t.id})" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-700">Add</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        updateProgress();
+    }
+
+    window.clearAllTasks = function() {
+        if (confirm("Are you sure you want to clear all your tasks?")) {
+            tasks = [];
+            streak = 0;
+            saveToStorage();
+        }
+    };
+
+    // Initial load
+    checkStreak();
+    renderTasks();
+})();
+</script>
+</body>
+</html>
